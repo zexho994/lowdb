@@ -34,7 +34,6 @@ public class BufferPool {
      */
     public static final int DEFAULT_PAGES = 50;
 
-    private final int capacity;
     private final List<Page> pages;
 
     /**
@@ -44,7 +43,6 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
-        capacity = numPages;
         pages = new ArrayList<>(numPages);
     }
 
