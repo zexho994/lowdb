@@ -6,6 +6,7 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * TupleDesc describes the schema of a tuple.
@@ -15,6 +16,7 @@ import java.util.stream.IntStream;
 public class TupleDesc implements Serializable {
 
     private final List<TDItem> items;
+    private final int size;
 
     /**
      * A help class to facilitate organizing the information of each field
@@ -41,6 +43,19 @@ public class TupleDesc implements Serializable {
         public String toString() {
             return fieldName + "(" + fieldType + ")";
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof TDItem)) return false;
+            TDItem tdItem = (TDItem) o;
+            return fieldType == tdItem.fieldType && fieldName.equals(tdItem.fieldName);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(fieldType, fieldName);
+        }
     }
 
     /**
@@ -64,10 +79,10 @@ public class TupleDesc implements Serializable {
      *                be null.
      */
     public TupleDesc(Type[] typeAr, String[] fieldAr) {
-        // todo: some code goes here
+        // some code goes here
         this.items = new ArrayList<>(typeAr.length);
         IntStream.range(0, typeAr.length).mapToObj(i -> new TDItem(typeAr[i], fieldAr[i])).forEach(this.items::add);
-
+        size = this.items.stream().map(i -> i.fieldType.getLen()).reduce(Integer::sum).get();
     }
 
     /**
@@ -78,15 +93,16 @@ public class TupleDesc implements Serializable {
      *               TupleDesc. It must contain at least one entry.
      */
     public TupleDesc(Type[] typeAr) {
-        // todo: some code goes here
+        // some code goes here
         this.items = Arrays.stream(typeAr).map(type -> new TDItem(type, "")).collect(Collectors.toList());
+        size = this.items.stream().map(i -> i.fieldType.getLen()).reduce(Integer::sum).get();
     }
 
     /**
      * @return the number of fields in this TupleDesc
      */
     public int numFields() {
-        // todo: some code goes here
+        // some code goes here
         return this.items.size();
     }
 
@@ -100,7 +116,7 @@ public class TupleDesc implements Serializable {
      * @throws NoSuchElementException if i is not a valid field reference.
      */
     public String getFieldName(int i) throws NoSuchElementException {
-        // todo: some code goes here
+        // some code goes here
         return this.items.get(i).fieldName;
     }
 
@@ -148,7 +164,7 @@ public class TupleDesc implements Serializable {
      */
     public int getSize() {
         // some code goes here
-        return (int) this.items.stream().map(i -> i.fieldType.getLen()).count();
+        return this.size;
     }
 
     /**
@@ -162,16 +178,15 @@ public class TupleDesc implements Serializable {
      */
     public static TupleDesc merge(TupleDesc td1, TupleDesc td2) {
         // some code goes here
-        final Type[] newTypeArray = new Type[td1.getSize() + td2.getSize()];
-        final String[] newNameArray = new String[td1.getSize() + td2.getSize()];
+        final Type[] newTypeArray = new Type[td1.numFields() + td2.numFields()];
+        final String[] newNameArray = new String[td1.numFields() + td2.numFields()];
         int idx = 0;
-        while (idx < td1.getSize()) {
+        while (idx < td1.numFields()) {
             newTypeArray[idx] = td1.getFieldType(idx);
-            newNameArray[idx] = td1.getFieldName(idx);
-            idx++;
+            newNameArray[idx] = td1.getFieldName(idx++);
         }
         int i = 0;
-        while (i < td2.getSize()) {
+        while (i < td2.numFields()) {
             newNameArray[idx] = td2.getFieldName(i);
             newTypeArray[idx++] = td2.getFieldType(i++);
         }
@@ -190,25 +205,17 @@ public class TupleDesc implements Serializable {
      * @return true if the object is equal to this TupleDesc.
      */
 
+    @Override
     public boolean equals(Object o) {
-        // some code goes here
-        if (null == o) return false;
-        if (o == this) return true;
-        if (!o.getClass().isInstance(this)) return false;
-        TupleDesc t = (TupleDesc) o;
-        if (t.getSize() != this.getSize()) return false;
-        for (int i = 0; i < this.getSize(); i++) {
-            if (!this.getFieldType(i).equals(t.getFieldType(i))) {
-                return false;
-            }
-        }
-        return true;
+        if (this == o) return true;
+        if (!(o instanceof TupleDesc)) return false;
+        TupleDesc tupleDesc = (TupleDesc) o;
+        return numFields() == tupleDesc.numFields() && items.equals(tupleDesc.items);
     }
 
+    @Override
     public int hashCode() {
-        // If you want to use TupleDesc as keys for HashMap, implement this so
-        // that equal objects have equals hashCode() results
-        throw new UnsupportedOperationException("unimplemented");
+        return Objects.hash(items, numFields());
     }
 
     /**
@@ -221,7 +228,7 @@ public class TupleDesc implements Serializable {
     public String toString() {
         // some code goes here
         StringBuilder str = new StringBuilder();
-        IntStream.range(0, this.getSize())
+        IntStream.range(0, this.numFields())
                 .mapToObj(i -> String.format("%s(%s),", this.getFieldType(i), this.getFieldName(i)))
                 .forEach(str::append);
         return str.substring(0, str.length() - 1);
