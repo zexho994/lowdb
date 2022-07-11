@@ -8,7 +8,6 @@ public class HeapPageId implements PageId {
     private final int tableId;
     private final int pgNo;
 
-
     /**
      * Constructor. Create a page id structure for a specific page of a
      * specific table.

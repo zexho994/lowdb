@@ -18,28 +18,28 @@ import java.util.stream.Collectors;
  */
 public class HeapPage implements Page {
 
-    final HeapPageId pid;
+    private final HeapPageId pid;
 
     /**
      * 一个page中存储一个table的数据
      * 所以存在一个{@link TupleDesc} 表示table的数据结构
      */
-    final TupleDesc td;
+    private final TupleDesc td;
 
     /**
      * bitmap 的结构,表示某个位置的 tuple 是否可用
      */
-    final byte[] header;
+    private final byte[] header;
 
     /**
      * page中所有的 tuple 数据
      */
-    final Tuple[] tuples;
+    private final Tuple[] tuples;
 
     /**
      * slots 的大小
      */
-    final int numSlots;
+    private final int numSlots;
 
     byte[] oldData;
 
