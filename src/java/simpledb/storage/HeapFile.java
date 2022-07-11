@@ -1,6 +1,9 @@
 package simpledb.storage;
 
+import simpledb.common.Catalog;
+import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -22,7 +25,7 @@ public class HeapFile implements DbFile {
     final File file;
     final TupleDesc tupleDesc;
     final long fileSize;
-    final double pageNum;
+    final int pageNum;
 
     /**
      * Constructs a heap file backed by the specified file.
@@ -35,7 +38,7 @@ public class HeapFile implements DbFile {
         this.file = f;
         this.tupleDesc = td;
         this.fileSize = f.length();
-        this.pageNum = Math.floor(fileSize / BufferPool.getPageSize());
+        this.pageNum = (int) Math.floor(fileSize / BufferPool.getPageSize());
     }
 
     /**
@@ -119,61 +122,69 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
+        HeapFileDbFileIterator heapFileDbFileIterator = new HeapFileDbFileIterator();
+        heapFileDbFileIterator.setHeapFile(this);
+        return heapFileDbFileIterator;
+    }
 
-        return new DbFileIterator() {
-            HeapFile heapFile = new HeapFile(file, tupleDesc);
-            int pageNo = 0;
-            int tdNo = 0;
-            Iterator<Tuple> iterator;
+    static class HeapFileDbFileIterator implements DbFileIterator {
+        int pageNo = 0;
+        int tdNo = 0;
+        int pageNum = 0;
+        Iterator<Tuple> iterator;
+        HeapFile heapFile;
 
-            @Override
-            public void open() throws DbException, TransactionAbortedException {
-                pageNo = 0;
-                tdNo = 0;
-                iterator = getIterator(pageNo);
-            }
+        @Override
+        public void open() throws DbException, TransactionAbortedException {
+            pageNo = 0;
+            tdNo = 0;
+            iterator = getIterator(pageNo);
+        }
 
-            private Iterator<Tuple> getIterator(int page) {
-                if (pageNo == pageNum) return null;
-                PageId pageId = new HeapPageId(heapFile.getId(), page);
-                HeapPage hp = (HeapPage) heapFile.readPage(pageId);
-                return hp.iterator();
-            }
+        public void setHeapFile(HeapFile hf) {
+            this.heapFile = hf;
+            this.pageNum = hf.pageNum;
+        }
 
-            @Override
-            public boolean hasNext() throws DbException, TransactionAbortedException {
-                if (iterator == null) return false;
-                if (iterator.hasNext()) return true;
-                if (pageNo < pageNum - 1) return true;
-                return false;
-            }
+        private Iterator<Tuple> getIterator(int page) {
+            if (pageNo == pageNum) return null;
+            PageId pageId = new HeapPageId(heapFile.getId(), page);
+            HeapPage hp = (HeapPage) heapFile.readPage(pageId);
+            return hp.iterator();
+        }
 
-            @Override
-            public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
-                if (iterator != null) {
-                    if (iterator.hasNext()) {
-                        return iterator.next();
-                    } else if (++pageNo < pageNum) {
-                        iterator = getIterator(pageNo);
-                        return iterator.next();
-                    }
+        @Override
+        public boolean hasNext() throws DbException, TransactionAbortedException {
+            if (iterator == null) return false;
+            if (iterator.hasNext()) return true;
+            if (pageNo < pageNum - 1) return true;
+            return false;
+        }
+
+        @Override
+        public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
+            if (iterator != null) {
+                if (iterator.hasNext()) {
+                    return iterator.next();
+                } else if (++pageNo < pageNum) {
+                    iterator = getIterator(pageNo);
+                    return iterator.next();
                 }
-
-                throw new NoSuchElementException();
             }
 
-            @Override
-            public void rewind() throws DbException, TransactionAbortedException {
-                close();
-                open();
-            }
+            throw new NoSuchElementException();
+        }
 
-            @Override
-            public void close() {
-                iterator = null;
-            }
-        };
+        @Override
+        public void rewind() throws DbException, TransactionAbortedException {
+            close();
+            open();
+        }
 
+        @Override
+        public void close() {
+            iterator = null;
+        }
     }
 
 }
