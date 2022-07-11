@@ -42,7 +42,8 @@ public class ScanTest extends SimpleDbTestBase {
     }
 
     /** Scan 1-4 columns. */
-    @Test public void testSmall() throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void testSmall() throws IOException, DbException, TransactionAbortedException {
         int[] columnSizes = new int[]{1, 2, 3, 4};
         int[] rowSizes =
                 new int[]{0, 1, 2, 511, 512, 513, 1023, 1024, 1025, 4096 + r.nextInt(4096)};
@@ -50,7 +51,8 @@ public class ScanTest extends SimpleDbTestBase {
     }
 
     /** Test that rewinding a SeqScan iterator works. */
-    @Test public void testRewind() throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void testRewind() throws IOException, DbException, TransactionAbortedException {
         List<List<Integer>> tuples = new ArrayList<>();
         HeapFile f = SystemTestUtil.createRandomHeapFile(2, 1000, null, tuples);
 
@@ -73,10 +75,14 @@ public class ScanTest extends SimpleDbTestBase {
         Database.getBufferPool().transactionComplete(tid);
     }
 
-    /** Verifies that the buffer pool is actually caching data.
+    /**
+     * Verifies that the buffer pool is actually caching data.
+     *
      * @throws TransactionAbortedException
-     * @throws DbException */
-    @Test public void testCache() throws IOException, DbException, TransactionAbortedException {
+     * @throws DbException
+     */
+    @Test
+    public void testCache() throws IOException, DbException, TransactionAbortedException {
         /* Counts the number of readPage operations. */
         class InstrumentedHeapFile extends HeapFile {
             public InstrumentedHeapFile(File f, TupleDesc td) {
@@ -95,7 +101,7 @@ public class ScanTest extends SimpleDbTestBase {
         // Create the table
         final int PAGES = 30;
         List<List<Integer>> tuples = new ArrayList<>();
-        File f = SystemTestUtil.createRandomHeapFileUnopened(1, 992*PAGES, 1000, null, tuples);
+        File f = SystemTestUtil.createRandomHeapFileUnopened(1, 992 * PAGES, 1000, null, tuples);
         TupleDesc td = Utility.getTupleDesc(1);
         InstrumentedHeapFile table = new InstrumentedHeapFile(f, td);
         Database.getCatalog().addTable(table, SystemTestUtil.getUUID());
@@ -110,10 +116,13 @@ public class ScanTest extends SimpleDbTestBase {
         assertEquals(0, table.readCount);
     }
 
-    /** Verifies SeqScan's getTupleDesc prefixes the table name + "." to the field names
+    /**
+     * Verifies SeqScan's getTupleDesc prefixes the table name + "." to the field names
+     *
      * @throws IOException
      */
-    @Test public void testTupleDesc() throws IOException {
+    @Test
+    public void testTupleDesc() throws IOException {
         List<List<Integer>> tuples = new ArrayList<>();
         HeapFile f = SystemTestUtil.createRandomHeapFile(2, 1000, null, tuples, "test");
 
@@ -130,7 +139,7 @@ public class ScanTest extends SimpleDbTestBase {
 
         // Check each field for the appropriate tableAlias. prefix
         for (int i = 0; i < original.numFields(); i++) {
-           assertEquals(prefix + "." + original.getFieldName(i), prefixed.getFieldName(i));
+            assertEquals(prefix + "." + original.getFieldName(i), prefixed.getFieldName(i));
         }
     }
 
