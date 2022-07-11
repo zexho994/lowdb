@@ -350,7 +350,9 @@ public class HeapPage implements Page {
         // some code goes here
         List<Tuple> tupleList = new ArrayList<>();
         for (int i = 0; i < numSlots; i++) {
-            if (isSlotUsed(i)) tupleList.add(tuples[i]);
+            if (isSlotUsed(i)) {
+                tupleList.add(tuples[i]);
+            }
         }
         return tupleList.iterator();
     }

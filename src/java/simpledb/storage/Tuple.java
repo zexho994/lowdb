@@ -90,7 +90,7 @@ public class Tuple implements Serializable {
         for (int i = 0; i < this.fieldsMap.size(); i++) {
             str.append(this.fieldsMap.get(i).toString()).append("\t");
         }
-        return str.substring(0, str.length() - 2);
+        return str.substring(0, str.length() - 1);
     }
 
     /**
