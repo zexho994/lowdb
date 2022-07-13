@@ -44,11 +44,7 @@ public class StringAggregator implements Aggregator {
         this.groupByFieldType = gbfieldtype;
         this.aggregationFieldIdx = afield;
         this.op = what;
-        if (gbfieldtype == null) {
-            this.groupingMap = null;
-        } else {
-            this.groupingMap = new HashMap<>();
-        }
+        this.groupingMap = new HashMap<>();
     }
 
     /**
@@ -58,48 +54,21 @@ public class StringAggregator implements Aggregator {
      */
     public void mergeTupleIntoGroup(Tuple tup) {
         // some code goes here
-        if (groupByFieldType == null) {
+        if (groupByFieldIdx == -1) {
             return;
         }
+        if (tupleDesc == null) {
+            tupleDesc = new TupleDesc(new Type[]{tup.getTupleDesc().getFieldType(groupByFieldIdx), Type.INT_TYPE});
+        }
 
-        // some code goes here
-        this.tupleDesc = tup.getTupleDesc();
         Field gfi = tup.getField(groupByFieldIdx);
-//        IntField field = (IntField) tup.getField(this.aggregationFieldIdx);
-//        Integer oldVal;
-
         switch (op) {
-//            case MIN:
-//                oldVal = groupingMap.getOrDefault(gfi, Integer.MAX_VALUE);
-//                if (field.getValue() < oldVal) {
-//                    groupingMap.put(gfi, field.getValue());
-//                }
-//                break;
-//            case MAX:
-//                oldVal = groupingMap.getOrDefault(gfi, Integer.MIN_VALUE);
-//                if (field.getValue() > oldVal) {
-//                    groupingMap.put(gfi, field.getValue());
-//                }
-//                break;
-//            case SUM:
-//                oldVal = groupingMap.getOrDefault(gfi, 0);
-//                groupingMap.put(gfi, oldVal + field.getValue());
-//                break;
-//            case AVG:
-//                Integer[] count = countMap.getOrDefault(gfi, new Integer[]{0, 0});
-//                count[0]++;
-//                count[1] += field.getValue();
-//                groupingMap.put(gfi, count[1] / count[0]);
-//                countMap.put(gfi, count);
-//                break;
             case COUNT:
                 groupingMap.put(gfi, groupingMap.getOrDefault(gfi, 0) + 1);
                 break;
             default:
                 throw new RuntimeException("op not suppose");
         }
-
-
     }
 
     /**
@@ -111,15 +80,6 @@ public class StringAggregator implements Aggregator {
      * aggregate specified in the constructor.
      */
     public OpIterator iterator() {
-        Type[] t = new Type[tupleDesc.numFields()];
-        String[] s = new String[tupleDesc.numFields()];
-        for (int i = 0; i < tupleDesc.numFields(); i++) {
-            t[i] = tupleDesc.getFieldType(i);
-            s[i] = tupleDesc.getFieldName(i);
-        }
-        t[aggregationFieldIdx] = Type.INT_TYPE;
-        TupleDesc td = new TupleDesc(t, s);
-
         // some code goes here
         return new OpIterator() {
             private Iterator<Field> keyIterator;
@@ -144,7 +104,7 @@ public class StringAggregator implements Aggregator {
                 }
                 Field field = keyIterator.next();
                 Integer v = groupingMap.get(field);
-                Tuple tuple = new Tuple(td);
+                Tuple tuple = new Tuple(tupleDesc);
                 tuple.setField(aggregationFieldIdx, new IntField(v));
                 tuple.setField(groupByFieldIdx, field);
                 return tuple;

@@ -69,7 +69,9 @@ public class IntegerAggregator implements Aggregator {
         }
 
         // some code goes here
-        this.tupleDesc = tup.getTupleDesc();
+        if (tupleDesc == null) {
+            tupleDesc = new TupleDesc(new Type[]{tup.getTupleDesc().getFieldType(groupByFieldIdx), Type.INT_TYPE});
+        }
         Field gfi = tup.getField(groupByFieldIdx);
         IntField intField = (IntField) tup.getField(this.aggregateFieldIdx);
         Integer oldVal;

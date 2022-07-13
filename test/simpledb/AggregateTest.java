@@ -179,7 +179,7 @@ public class AggregateTest extends SimpleDbTestBase {
     max.open();
     TestUtil.matchAllTuples(max, op);
   }
-
+t
   /**
    * Unit test for Aggregate.getNext() using a min aggregate
    */
