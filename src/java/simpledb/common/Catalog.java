@@ -34,8 +34,8 @@ public class Catalog {
         }
     }
 
-    final Map<String, Table> tableNameMap;
-    final Map<Integer, Table> tableIdMap;
+    private final Map<String, Table> tableNameMap;
+    private final Map<Integer, Table> tableIdMap;
 
 
     /**
@@ -60,8 +60,8 @@ public class Catalog {
      */
     public void addTable(DbFile file, String name, String pkeyField) {
         // some code goes here
-        this.tableNameMap.put(name, new Table(file, name, pkeyField));
-        this.tableIdMap.put(file.getId(), new Table(file, name, pkeyField));
+        tableNameMap.put(name, new Table(file, name, pkeyField));
+        tableIdMap.put(file.getId(), new Table(file, name, pkeyField));
     }
 
     public void addTable(DbFile file, String name) {
@@ -88,10 +88,6 @@ public class Catalog {
     public int getTableId(String name) throws NoSuchElementException {
 
         // some code goes here
-        if (name == null){
-            throw new NoSuchElementException("name = " + name);
-        }
-
         Table table = this.tableNameMap.get(name);
         if (table == null) {
             throw new NoSuchElementException("name = " + name);
@@ -127,7 +123,9 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         // some code goes here
-        return this.tableIdMap.get(tableid).file;
+        Table table = this.tableIdMap.get(tableid);
+        if (table == null) return null;
+        return table.file;
     }
 
     public String getPrimaryKey(int tableid) {

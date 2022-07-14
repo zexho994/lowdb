@@ -1,11 +1,13 @@
 package simpledb.storage;
 
+import simpledb.common.Catalog;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
+import java.awt.image.DataBuffer;
 import java.io.*;
 import java.util.*;
 
@@ -131,7 +133,7 @@ public class HeapFile implements DbFile {
 
         // step1: append t into file
         for (int i = 0; i < numPages(); i++) {
-            HeapPage page = (HeapPage) this.readPage(new HeapPageId(id, i));
+            HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, i), Permissions.READ_WRITE);
             if (page.getNumEmptySlots() > 0) {
                 page.insertTuple(t);
                 writePage(page);
@@ -142,7 +144,6 @@ public class HeapFile implements DbFile {
         HeapPage page = new HeapPage(new HeapPageId(id, numPages()), new byte[BufferPool.getPageSize()]);
         page.insertTuple(t);
         writePage(page);
-
         return null;
         // not necessary for lab1
     }

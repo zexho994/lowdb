@@ -9,6 +9,7 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
+import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +39,7 @@ public class BufferPool {
      */
     public static final int DEFAULT_PAGES = 50;
 
-    private final Map<Integer, Page> pages;
+    private final Map<PageId, Page> pages;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -82,12 +83,15 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
             throws TransactionAbortedException, DbException {
         // some code goes here
-        if (!pages.containsKey(pid.getPageNumber())) {
+        if (!pages.containsKey(pid)) {
             DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+            if (databaseFile == null) {
+                return null;
+            }
             Page page = databaseFile.readPage(pid);
-            pages.put(pid.getPageNumber(), page);
+            pages.put(pid, page);
         }
-        return pages.get(pid.getPageNumber());
+        return pages.get(pid);
     }
 
     /**
@@ -152,6 +156,8 @@ public class BufferPool {
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        DbFile databaseFile = Database.getCatalog().getDatabaseFile(tableId);
+        databaseFile.insertTuple(tid, t);
     }
 
     /**
@@ -171,6 +177,10 @@ public class BufferPool {
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+
+        HeapPage page = (HeapPage) getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
+        if (page == null) throw new DbException("page not exist");
+        page.deleteTuple(t);
     }
 
     /**

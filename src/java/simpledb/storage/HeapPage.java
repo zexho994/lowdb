@@ -284,7 +284,7 @@ public class HeapPage implements Page {
             }
         }
 
-        throw new DbException("not found");
+        throw new DbException("not found t = {}" + t);
     }
 
     /**
