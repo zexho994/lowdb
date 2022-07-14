@@ -7,7 +7,6 @@ import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
-import java.awt.image.DataBuffer;
 import java.io.*;
 import java.util.*;
 
@@ -26,8 +25,6 @@ public class HeapFile implements DbFile {
     private final File file;
     private final TupleDesc tupleDesc;
     private long fileSize;
-    private final int pageCapacity;
-    private final Map<PageId, Page> pageCache;
     private final int id;
 
 
@@ -39,12 +36,10 @@ public class HeapFile implements DbFile {
      */
     public HeapFile(File f, TupleDesc td) {
         // some code goes here
-        this.file = f;
         this.id = f.getAbsolutePath().hashCode();
+        this.file = f;
         this.tupleDesc = td;
         this.fileSize = f.length();
-        this.pageCapacity = (int) Math.floor(fileSize / BufferPool.getPageSize());
-        this.pageCache = new HashMap<>(pageCapacity);
     }
 
     /**
@@ -84,10 +79,6 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public Page readPage(PageId pid) {
         // some code goes here
-        if (pageCache.containsKey(pid)) {
-            return pageCache.get(pid);
-        }
-
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
             long pos = (long) pid.getPageNumber() * BufferPool.getPageSize();
             raf.seek(pos);
@@ -113,7 +104,6 @@ public class HeapFile implements DbFile {
             }
             raf.seek(pos);
             raf.write(data);
-            pageCache.put(page.getId(), page);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -136,7 +126,6 @@ public class HeapFile implements DbFile {
             HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, i), Permissions.READ_WRITE);
             if (page.getNumEmptySlots() > 0) {
                 page.insertTuple(t);
-                writePage(page);
                 return null;
             }
         }
@@ -172,7 +161,12 @@ public class HeapFile implements DbFile {
                 if ((long) pageNo * BufferPool.getPageSize() >= fileSize) {
                     return null;
                 }
-                iterator = ((HeapPage) readPage(new HeapPageId(id, pageNo))).iterator();
+                try {
+                    HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, pageNo), Permissions.READ_WRITE);
+                    iterator = page.iterator();
+                } catch (TransactionAbortedException | DbException e) {
+                    throw new RuntimeException(e);
+                }
                 return iterator;
             }
 

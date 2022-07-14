@@ -157,7 +157,8 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
         DbFile databaseFile = Database.getCatalog().getDatabaseFile(tableId);
-        databaseFile.insertTuple(tid, t);
+        List<Page> pages = databaseFile.insertTuple(tid, t);
+        upda
     }
 
     /**
@@ -233,6 +234,13 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+    }
+
+    private void updateBufferPool(List<Page> pagelist, TransactionId tid) {
+        for (Page p : pagelist) {
+            p.markDirty(true, tid);
+            pages.put(p.getId(), p);
+        }
     }
 
 }

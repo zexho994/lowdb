@@ -5,6 +5,7 @@ import simpledb.common.DbException;
 import simpledb.common.Catalog;
 import simpledb.transaction.TransactionId;
 
+import javax.xml.crypto.Data;
 import java.util.*;
 import java.io.*;
 import java.util.stream.Collectors;
@@ -296,11 +297,10 @@ public class HeapPage implements Page {
      * @throws DbException if the page is full (no empty slots) or tupledesc
      *                     is mismatch.
      */
-    public void insertTuple(Tuple t) throws DbException {
+    public void insertTuple(Tuple t) throws DbException, IOException {
         // some code goes here
         // not necessary for lab1
 
-        // step1: find solts available
         int idx = 0;
         for (int b = 0; b < header.length; b++) {
             int pos = 1;
@@ -309,18 +309,17 @@ public class HeapPage implements Page {
                     header[b] |= pos;
                     b = header.length;
                     t.setRecordId(new RecordId(pid, b * 8 + i));
-                    break;
+                    tuples[idx] = t;
+                    DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+                    databaseFile.writePage(this);
+                    return;
                 }
                 idx++;
                 pos <<= 1;
             }
         }
 
-        if (idx >= this.numSlots) {
-            throw new DbException("page is full");
-        }
-
-        this.tuples[idx] = t;
+        throw new DbException("page is full");
     }
 
 
