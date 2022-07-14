@@ -7,11 +7,13 @@ import simpledb.systemtest.SimpleDbTestBase;
 import simpledb.systemtest.SystemTestUtil;
 
 import java.util.*;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
+
 import junit.framework.JUnit4TestAdapter;
 import simpledb.transaction.TransactionId;
 
@@ -55,8 +57,9 @@ public class HeapFileReadTest extends SimpleDbTestBase {
      */
     @Test
     public void getTupleDesc() {
-        assertEquals(td, hf.getTupleDesc());        
+        assertEquals(td, hf.getTupleDesc());
     }
+
     /**
      * Unit test for HeapFile.numPages()
      */
