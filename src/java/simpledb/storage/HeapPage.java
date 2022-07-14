@@ -287,7 +287,30 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+
+        // step1: find solts available
+        int idx = 0;
+        for (int b = 0; b < header.length; b++) {
+            int pos = 1;
+            for (int i = 0; i < 8; i++) {
+                if ((header[b] & pos) == 0) {
+                    header[b] |= pos;
+                    b = header.length;
+                    t.setRecordId(new RecordId(pid, b * 8 + i));
+                    break;
+                }
+                idx++;
+                pos <<= 1;
+            }
+        }
+
+        if (idx >= this.numSlots) {
+            throw new DbException("page is full");
+        }
+
+        this.tuples[idx] = t;
     }
+
 
     /**
      * Marks this page as dirty/not dirty and record that transaction

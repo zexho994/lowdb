@@ -106,6 +106,11 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public List<Page> insertTuple(TransactionId tid, Tuple t) throws DbException, IOException, TransactionAbortedException {
         // some code goes here
+
+        // step1: append t into file
+
+        // step2: update page header
+
         return null;
         // not necessary for lab1
     }
@@ -176,7 +181,6 @@ public class HeapFile implements DbFile {
                 iterator = null;
             }
         };
-
     }
 
 }

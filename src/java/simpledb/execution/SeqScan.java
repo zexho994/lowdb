@@ -22,7 +22,6 @@ public class SeqScan implements OpIterator {
     private String tableAlias;
     private int tableId;
     private DbFileIterator iterator;
-    private HeapPage heapPage;
 
     /**
      * Creates a sequential scan over the specified table as a part of the
