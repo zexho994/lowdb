@@ -273,6 +273,18 @@ public class HeapPage implements Page {
     public void deleteTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+        for (int i = 0; i < numSlots; i++) {
+            if (!isSlotUsed(i)) {
+                continue;
+            }
+            if (t.equals(tuples[i])) {
+                tuples[i] = null;
+                flipHeader(i, 0);
+                return;
+            }
+        }
+
+        throw new DbException("not found");
     }
 
     /**
@@ -378,6 +390,25 @@ public class HeapPage implements Page {
             }
         }
         return tupleList.iterator();
+    }
+
+    /**
+     * update header[idx] to n.
+     *
+     * @param idx the array idx of header
+     */
+    private void flipHeader(int idx, int n) {
+        if (n != 0 && n != 1) {
+            throw new RuntimeException("n must be 0 or 1 !");
+        }
+
+        int i = idx / 8;
+        int pos = idx % 8;
+        if (n == 1) {
+            header[i] |= (1 << pos);
+        } else {
+            header[i] &= ~(1 << pos);
+        }
     }
 
 }
