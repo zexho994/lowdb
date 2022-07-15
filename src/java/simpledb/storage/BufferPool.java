@@ -1,6 +1,5 @@
 package simpledb.storage;
 
-import simpledb.common.Catalog;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
@@ -9,9 +8,6 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
-import java.rmi.RemoteException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -40,6 +36,7 @@ public class BufferPool {
     public static final int DEFAULT_PAGES = 50;
 
     private final Map<PageId, Page> pages;
+    private final int maxPages;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -49,6 +46,7 @@ public class BufferPool {
     public BufferPool(int numPages) {
         // some code goes here
         pages = new ConcurrentHashMap<>(numPages);
+        this.maxPages = numPages;
     }
 
     public static int getPageSize() {
@@ -87,6 +85,9 @@ public class BufferPool {
             DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             if (databaseFile == null) {
                 return null;
+            }
+            if (this.numPages() >= maxPages()) {
+                this.evictPage();
             }
             Page page = databaseFile.readPage(pid);
             pages.put(pid, page);
@@ -206,6 +207,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        pages.remove(pid);
     }
 
     /**
@@ -216,6 +218,8 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        Page page = pages.get(pid);
+        Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(page);
     }
 
     /**
@@ -233,6 +237,23 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        Map.Entry<PageId, Page> removed = pages.entrySet().iterator().next();
+        PageId pageId = removed.getKey();
+
+        try {
+            flushPage(pageId);
+            discardPage(pageId);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public int numPages() {
+        return pages.size();
+    }
+
+    public int maxPages() {
+        return maxPages;
     }
 
 }
