@@ -59,6 +59,7 @@ public class Insert extends Operator {
         // some code goes here
         super.open();
         child.open();
+        count = 0;
     }
 
     public void close() {

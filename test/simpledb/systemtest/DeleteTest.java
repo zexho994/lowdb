@@ -26,9 +26,6 @@ public class DeleteTest extends FilterBase {
         SeqScan ss = new SeqScan(tid, table.getId(), "");
         Filter filter = new Filter(predicate, ss);
         Delete deleteOperator = new Delete(tid, filter);
-//        Query q = new Query(deleteOperator, tid);
-
-//        q.start();
         deleteOperator.open();
         boolean hasResult = false;
         int result = -1;
