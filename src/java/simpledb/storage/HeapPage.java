@@ -310,8 +310,7 @@ public class HeapPage implements Page {
                     b = header.length;
                     t.setRecordId(new RecordId(pid, b * 8 + i));
                     tuples[idx] = t;
-                    DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
-                    databaseFile.writePage(this);
+                    Database.getCatalog().getDatabaseFile(this.pid.getTableId()).writePage(this);
                     return;
                 }
                 idx++;

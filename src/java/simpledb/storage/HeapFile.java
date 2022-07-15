@@ -24,7 +24,6 @@ public class HeapFile implements DbFile {
 
     private final File file;
     private final TupleDesc tupleDesc;
-    private long fileSize;
     private final int id;
 
 
@@ -39,7 +38,6 @@ public class HeapFile implements DbFile {
         this.id = f.getAbsolutePath().hashCode();
         this.file = f;
         this.tupleDesc = td;
-        this.fileSize = f.length();
     }
 
     /**
@@ -99,9 +97,6 @@ public class HeapFile implements DbFile {
         byte[] data = page.getPageData();
         try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
             int pos = pageNumber * BufferPool.getPageSize();
-            if (pos >= fileSize) {
-                fileSize += data.length;
-            }
             raf.seek(pos);
             raf.write(data);
         } catch (IOException e) {
@@ -114,26 +109,28 @@ public class HeapFile implements DbFile {
      */
     public int numPages() {
         // some code goes here
-        return (int) (fileSize / BufferPool.getPageSize());
+        return (int) (this.file.length() / BufferPool.getPageSize());
     }
 
     // see DbFile.java for javadocs
     public List<Page> insertTuple(TransactionId tid, Tuple t) throws DbException, IOException, TransactionAbortedException {
         // some code goes here
 
-        // step1: append t into file
+        HeapPage page = null;
         for (int i = 0; i < numPages(); i++) {
-            HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, i), Permissions.READ_WRITE);
+            page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, i), Permissions.READ_WRITE);
             if (page.getNumEmptySlots() > 0) {
-                page.insertTuple(t);
-                return null;
+                break;
             }
+            page = null;
         }
 
-        HeapPage page = new HeapPage(new HeapPageId(id, numPages()), new byte[BufferPool.getPageSize()]);
+        if (page == null) {
+            page = new HeapPage(new HeapPageId(id, numPages()), new byte[BufferPool.getPageSize()]);
+        }
         page.insertTuple(t);
-        writePage(page);
-        return null;
+        this.writePage(page);
+        return Collections.singletonList(page);
         // not necessary for lab1
     }
 
@@ -158,7 +155,7 @@ public class HeapFile implements DbFile {
             }
 
             private Iterator<Tuple> getIterator(int pageNo) {
-                if ((long) pageNo * BufferPool.getPageSize() >= fileSize) {
+                if (pageNo > numPages()) {
                     return null;
                 }
                 try {
