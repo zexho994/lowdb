@@ -18,6 +18,19 @@ public class TupleDesc implements Serializable {
     private final List<TDItem> items;
     private final int size;
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof TupleDesc)) return false;
+        TupleDesc tupleDesc = (TupleDesc) o;
+        return getSize() == tupleDesc.getSize() && items.equals(tupleDesc.items);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(items, getSize());
+    }
+
     /**
      * A help class to facilitate organizing the information of each field
      */
@@ -192,30 +205,6 @@ public class TupleDesc implements Serializable {
         }
 
         return new TupleDesc(newTypeArray, newNameArray);
-    }
-
-    /**
-     * Compares the specified object with this TupleDesc for equality. Two
-     * TupleDescs are considered equal if they have the same number of items
-     * and if the i-th type in this TupleDesc is equal to the i-th type in o
-     * for every i.
-     *
-     * @param o the Object to be compared for equality with this TupleDesc.
-     *
-     * @return true if the object is equal to this TupleDesc.
-     */
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof TupleDesc)) return false;
-        TupleDesc tupleDesc = (TupleDesc) o;
-        return numFields() == tupleDesc.numFields() && items.equals(tupleDesc.items);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(items, numFields());
     }
 
     /**
