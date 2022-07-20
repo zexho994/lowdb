@@ -58,7 +58,7 @@ public class IntHistogram {
     }
 
     private int getIndex(int v) {
-        return (int) Math.min(v - min / width, buckets.length - 1);
+        return (int) Math.min((v - min) / width, buckets.length - 1);
     }
 
     /**
@@ -91,10 +91,9 @@ public class IntHistogram {
             double bPart = (index + 1) * width - v / width;
             return bf * bPart + 1.0 * cnt / ntups;
         } else if (op.equals(Predicate.Op.GREATER_THAN_OR_EQ)) {
-            if (v <= min) return 0.0;
-            if (v >= max) return 1.0;
-            return 1.0 - estimateSelectivity(Predicate.Op.EQUALS, v)
-                    - estimateSelectivity(Predicate.Op.GREATER_THAN, v);
+            if (v < min) return 1.0;
+            if (v > max) return 0.0;
+            return estimateSelectivity(Predicate.Op.GREATER_THAN, v - 1);
         } else if (op.equals(Predicate.Op.LESS_THAN)) {
             if (v <= min) return 0.0;
             if (v >= max) return 1.0;
@@ -116,9 +115,9 @@ public class IntHistogram {
      */
     public double avgSelectivity() {
         // some code goes here
-
-
-        return 1.0;
+        int sum = 0;
+        for (int b : buckets) sum += b;
+        return 1.0 * sum / ntups;
     }
 
     /**
