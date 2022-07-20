@@ -222,4 +222,8 @@ public class TupleDesc implements Serializable {
                 .forEach(str::append);
         return str.substring(0, str.length() - 1);
     }
+
+    public static boolean isIntType(TupleDesc td,int i){
+        return td.getFieldType(i).equals(Type.INT_TYPE);
+    }
 }
