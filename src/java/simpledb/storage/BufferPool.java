@@ -53,7 +53,7 @@ public class BufferPool {
          */
         public void lock(PageId pid, TransactionId tid, Permissions perm) {
 
-            synchronized (this.innerLock) {
+            synchronized (innerLock) {
                 Holders holders = pageHolderCache.get(pid);
                 // 没有锁
                 if (holders == null || holders.size() == 0) {
@@ -61,22 +61,15 @@ public class BufferPool {
                     pageHolderCache.put(pid, holders);
                     holders.addHolder(Holder.build(tid, perm));
                     return;
-                }
-
-                // 有一个锁
-                if (holders.size() == 1 && holders.get(tid) != null) {
-                    // 自己的锁: 升级 or 降级
+                } else if (holders.size() == 1 && holders.get(tid) != null) {
+                    // 有一个锁,且自己的锁: 升级 or 降级
                     holders.get(tid).reentrant(perm);
                     return;
-                }
-
-                // 其他人的锁如果都是读锁，可以共享
-                if (perm == Permissions.READ_ONLY
-                        && holders.map.values().stream().allMatch(l -> l.exclusive.get() == 0)) {
+                } else if (perm == Permissions.READ_ONLY && holders.map.values().stream().allMatch(l -> l.exclusive.get() == 0)) {
+                    // 都是读锁,可以共享
                     holders.addHolder(Holder.build(tid, Permissions.READ_ONLY));
                     return;
                 }
-
             }
 
             lock(pid, tid, perm);
@@ -88,13 +81,13 @@ public class BufferPool {
         public void unlock(PageId pid, TransactionId tid) {
             synchronized (innerLock) {
                 Holder holder = pageHolderCache.get(pid).get(tid);
-                int i = 0;
+                int count = 0;
                 if (holder.share.get() > 0) {
-                    i = holder.share.decrementAndGet();
+                    count = holder.share.decrementAndGet();
                 } else {
-                    i = holder.exclusive.decrementAndGet();
+                    count = holder.exclusive.decrementAndGet();
                 }
-                if (i == 0) {
+                if (count == 0) {
                     pageHolderCache.get(pid).map.remove(tid);
                 }
             }
