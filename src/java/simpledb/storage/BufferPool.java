@@ -102,12 +102,6 @@ public class BufferPool {
     static class Holders {
         private final Map<TransactionId, Holder> map = new ConcurrentHashMap<>();
 
-        public static Holders init(TransactionId tid, Permissions perm) {
-            Holders h = new Holders();
-            h.addHolder(Holder.build(tid, perm));
-            return h;
-        }
-
         public void addHolder(Holder holder) {
             this.map.put(holder.tid, holder);
         }
@@ -120,23 +114,14 @@ public class BufferPool {
             return map.get(tid);
         }
 
+        public void remove(TransactionId tid) {
+            map.remove(tid);
+        }
+
         public int size() {
             return map.size();
         }
 
-        public synchronized boolean tryAcquire(TransactionId tid, Permissions perm) {
-            Holder holder = map.get(tid);
-            if (holder == null) {
-                return false;
-            } else if (holder.tid.equals(tid)) {
-                holder.reentrant(perm);
-                return true;
-            } else if (map.values().stream().allMatch(e -> e.exclusive.get() == 0)) {
-                holder.reentrant(perm);
-                return true;
-            }
-            return false;
-        }
     }
 
     static class Holder {
@@ -281,13 +266,7 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
-    }
-
-    /** Return true if the specified transaction has a lock on the specified page */
-    public boolean holdsLock(TransactionId tid, PageId p) {
-        // some code goes here
-        // not necessary for lab1|lab2
-        return pageLock.hold(p, tid);
+        this.transactionComplete(tid,true);
     }
 
     /**
@@ -300,6 +279,37 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
+        Map<PageId, Holders> pageHolderCache = pageLock.pageHolderCache;
+        Iterator<PageId> iterator = pageHolderCache.keySet().stream().iterator();
+        while (iterator.hasNext()) {
+            PageId pid = iterator.next();
+            Holders holders = pageHolderCache.get(pid);
+            if (!holders.contains(tid)) {
+                continue;
+            }
+            if (commit) {
+                try {
+                    flushPage(pid);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                this.discardPage(pid);
+                try {
+                    this.getPage(tid, pid, Permissions.READ_ONLY);
+                } catch (TransactionAbortedException | DbException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            holders.remove(tid);
+        }
+    }
+
+    /** Return true if the specified transaction has a lock on the specified page */
+    public boolean holdsLock(TransactionId tid, PageId p) {
+        // some code goes here
+        // not necessary for lab1|lab2
+        return pageLock.hold(p, tid);
     }
 
     /**
@@ -399,15 +409,24 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
-        Map.Entry<PageId, Page> removed = pages.entrySet().iterator().next();
-        PageId pageId = removed.getKey();
 
-        try {
-            flushPage(pageId);
-            discardPage(pageId);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        Iterator<Map.Entry<PageId, Page>> iterator = pages.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<PageId, Page> next = iterator.next();
+            PageId pid = next.getKey();
+            Holders holders = pageLock.pageHolderCache.get(pid);
+            if (holders == null || holders.size() == 0) {
+                try {
+                    flushPage(pid);
+                    discardPage(pid);
+                    pageLock.pageHolderCache.remove(pid);
+                    return;
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
+        throw new DbException("");
     }
 
     public int numPages() {

@@ -44,7 +44,10 @@ public class HeapPage implements Page {
 
     byte[] oldData;
 
+    boolean dirty = false;
+
     private final Byte oldDataLock = (byte) 0;
+    private TransactionId tid;
 
     /**
      * Create a HeapPage from a set of bytes of data read from disk.
@@ -310,7 +313,6 @@ public class HeapPage implements Page {
                     b = header.length;
                     t.setRecordId(new RecordId(pid, b * 8 + i));
                     tuples[idx] = t;
-                    Database.getCatalog().getDatabaseFile(this.pid.getTableId()).writePage(this);
                     return;
                 }
                 idx++;
@@ -329,6 +331,11 @@ public class HeapPage implements Page {
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here
         // not necessary for lab1
+        if (dirty) {
+            this.tid = tid;
+        } else {
+            this.tid = null;
+        }
     }
 
     /**
@@ -337,7 +344,7 @@ public class HeapPage implements Page {
     public TransactionId isDirty() {
         // some code goes here
         // Not necessary for lab1
-        return null;
+        return tid;
     }
 
     /**
