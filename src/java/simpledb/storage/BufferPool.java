@@ -8,8 +8,9 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -36,7 +37,175 @@ public class BufferPool {
     public static final int DEFAULT_PAGES = 50;
 
     private final Map<PageId, Page> pages;
+    private final PageLock pageLock;
     private final int maxPages;
+
+    static class PageLock {
+
+        private final Map<PageId, Holders> pageHolderCache = new ConcurrentHashMap<>();
+        private final String innerLock = "";
+
+        /**
+         * 获取锁
+         * 1. pageId 没有 holder，可以获取锁
+         * 2. pageId 有 holder，但是holder是自己,可以获取锁
+         * 3. 其他人获取了锁，不能获取锁
+         */
+        public void lock(PageId pid, TransactionId tid, Permissions perm) {
+
+            synchronized (this.innerLock) {
+                Holders holders = pageHolderCache.get(pid);
+                // 没有锁
+                if (holders == null || holders.size() == 0) {
+                    holders = new Holders();
+                    pageHolderCache.put(pid, holders);
+                    holders.addHolder(Holder.build(tid, perm));
+                    return;
+                }
+
+                // 有一个锁
+                if (holders.size() == 1 && holders.get(tid) != null) {
+                    // 自己的锁: 升级 or 降级
+                    holders.get(tid).reentrant(perm);
+                    return;
+                }
+
+                // 其他人的锁如果都是读锁，可以共享
+                if (perm == Permissions.READ_ONLY
+                        && holders.map.values().stream().allMatch(l -> l.exclusive.get() == 0)) {
+                    holders.addHolder(Holder.build(tid, Permissions.READ_ONLY));
+                    return;
+                }
+
+            }
+
+            lock(pid, tid, perm);
+        }
+
+        /**
+         * 释放锁
+         */
+        public void unlock(PageId pid, TransactionId tid) {
+            synchronized (innerLock) {
+                Holder holder = pageHolderCache.get(pid).get(tid);
+                int i = 0;
+                if (holder.share.get() > 0) {
+                    i = holder.share.decrementAndGet();
+                } else {
+                    i = holder.exclusive.decrementAndGet();
+                }
+                if (i == 0) {
+                    pageHolderCache.get(pid).map.remove(tid);
+                }
+            }
+        }
+
+        public boolean hold(PageId pid, TransactionId tid) {
+            return pageHolderCache.get(pid).contains(tid);
+        }
+
+    }
+
+    static class Holders {
+        private final Map<TransactionId, Holder> map = new ConcurrentHashMap<>();
+
+        public static Holders init(TransactionId tid, Permissions perm) {
+            Holders h = new Holders();
+            h.addHolder(Holder.build(tid, perm));
+            return h;
+        }
+
+        public void addHolder(Holder holder) {
+            this.map.put(holder.tid, holder);
+        }
+
+        public boolean contains(TransactionId t) {
+            return map.containsKey(t);
+        }
+
+        public Holder get(TransactionId tid) {
+            return map.get(tid);
+        }
+
+        public int size() {
+            return map.size();
+        }
+
+        public synchronized boolean tryAcquire(TransactionId tid, Permissions perm) {
+            Holder holder = map.get(tid);
+            if (holder == null) {
+                return false;
+            } else if (holder.tid.equals(tid)) {
+                holder.reentrant(perm);
+                return true;
+            } else if (map.values().stream().allMatch(e -> e.exclusive.get() == 0)) {
+                holder.reentrant(perm);
+                return true;
+            }
+            return false;
+        }
+    }
+
+    static class Holder {
+        private final TransactionId tid;
+        private final AtomicInteger share = new AtomicInteger(0);
+        private final AtomicInteger exclusive = new AtomicInteger(0);
+
+        public Holder(TransactionId tid, int share, int exclusive) {
+            this.tid = tid;
+            this.share.set(share);
+            this.exclusive.set(exclusive);
+        }
+
+        public static Holder build(TransactionId tid, Permissions perm) {
+            if (perm == Permissions.READ_ONLY) {
+                return new Holder(tid, 1, 0);
+            } else {
+                return new Holder(tid, 0, 1);
+            }
+        }
+
+        public boolean release() {
+            if (share.get() > 0) {
+                return share.decrementAndGet() == 0;
+            } else {
+                return exclusive.decrementAndGet() == 0;
+            }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Holder)) return false;
+            Holder holder = (Holder) o;
+            return tid.equals(holder.tid);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(tid);
+        }
+
+        public void reentrant(Permissions perm) {
+            if (perm == Permissions.READ_ONLY) {
+                if (exclusive.get() > 0) {
+                    share.set(exclusive.incrementAndGet());
+                    exclusive.set(0);
+                } else {
+                    share.incrementAndGet();
+                }
+            } else {
+                if (exclusive.get() > 0) {
+                    exclusive.incrementAndGet();
+                } else {
+                    exclusive.set(share.incrementAndGet());
+                    share.set(0);
+                }
+            }
+        }
+
+    }
+
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -45,8 +214,9 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // some code goes here
-        pages = new ConcurrentHashMap<>(numPages);
+        this.pages = new ConcurrentHashMap<>(numPages);
         this.maxPages = numPages;
+        this.pageLock = new PageLock();
     }
 
     public static int getPageSize() {
@@ -78,9 +248,9 @@ public class BufferPool {
      * @param pid  the ID of the requested page
      * @param perm the requested permissions on the page
      */
-    public Page getPage(TransactionId tid, PageId pid, Permissions perm)
-            throws TransactionAbortedException, DbException {
+    public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
+        pageLock.lock(pid, tid, perm);
         if (!pages.containsKey(pid)) {
             DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             if (databaseFile == null) {
@@ -107,6 +277,7 @@ public class BufferPool {
     public void unsafeReleasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        pageLock.unlock(pid, tid);
     }
 
     /**
@@ -123,7 +294,7 @@ public class BufferPool {
     public boolean holdsLock(TransactionId tid, PageId p) {
         // some code goes here
         // not necessary for lab1|lab2
-        return false;
+        return pageLock.hold(p, tid);
     }
 
     /**
@@ -153,8 +324,7 @@ public class BufferPool {
      * @param tableId the table to add the tuple to
      * @param t       the tuple to add
      */
-    public void insertTuple(TransactionId tid, int tableId, Tuple t)
-            throws DbException, IOException, TransactionAbortedException {
+    public void insertTuple(TransactionId tid, int tableId, Tuple t) throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
         DbFile databaseFile = Database.getCatalog().getDatabaseFile(tableId);
@@ -174,8 +344,7 @@ public class BufferPool {
      * @param tid the transaction deleting the tuple.
      * @param t   the tuple to delete
      */
-    public void deleteTuple(TransactionId tid, Tuple t)
-            throws DbException, IOException, TransactionAbortedException {
+    public void deleteTuple(TransactionId tid, Tuple t) throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
 

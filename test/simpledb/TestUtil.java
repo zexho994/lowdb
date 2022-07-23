@@ -348,7 +348,6 @@ public class TestUtil {
                 synchronized (elock) {
                     error = e;
                 }
-
                 Database.getBufferPool().transactionComplete(tid, false);
             }
         }
