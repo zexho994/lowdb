@@ -17,6 +17,7 @@ import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 
 public class AbortEvictionTest extends SimpleDbTestBase {
+
     // Note: This is a direct copy of the EvictTest method,
     // but the autograder won't necessarily have EvictTest when it runs
     // AbortEvictionTest, so we can't just cal the EvictTest method
@@ -28,13 +29,13 @@ public class AbortEvictionTest extends SimpleDbTestBase {
         value.setField(0, new IntField(-42));
         value.setField(1, new IntField(-43));
         TupleIterator insertRow = new TupleIterator(Utility.getTupleDesc(2), Collections.singletonList(value));
-
         // Insert the row
         Insert insert = new Insert(t.getId(), insertRow, f.getId());
         insert.open();
         Tuple result = insert.next();
         assertEquals(SystemTestUtil.SINGLE_INT_DESCRIPTOR, result.getTupleDesc());
-        assertEquals(1, ((IntField)result.getField(0)).getValue());
+        assertEquals(1, ((IntField) result.getField(0)).getValue());
+        // insert应该没有后续的数据
         assertFalse(insert.hasNext());
         insert.close();
     }
@@ -49,8 +50,8 @@ public class AbortEvictionTest extends SimpleDbTestBase {
         ss.open();
         while (ss.hasNext()) {
             Tuple v = ss.next();
-            int v0 = ((IntField)v.getField(0)).getValue();
-            int v1 = ((IntField)v.getField(1)).getValue();
+            int v0 = ((IntField) v.getField(0)).getValue();
+            int v1 = ((IntField) v.getField(1)).getValue();
             if (v0 == -42 && v1 == -43) {
                 assertFalse(found);
                 found = true;
@@ -60,13 +61,15 @@ public class AbortEvictionTest extends SimpleDbTestBase {
         return found;
     }
 
-    /** Aborts a transaction and ensures that its effects were actually undone.
+    /**
+     * Aborts a transaction and ensures that its effects were actually undone.
      * This requires dirty pages to <em>not</em> get flushed to disk.
      */
-    @Test public void testDoNotEvictDirtyPages()
+    @Test
+    public void testDoNotEvictDirtyPages()
             throws IOException, DbException, TransactionAbortedException {
         // Allocate a file with ~10 pages of data
-        HeapFile f = SystemTestUtil.createRandomHeapFile(2, 512*10, null, null);
+        HeapFile f = SystemTestUtil.createRandomHeapFile(2, 512 * 10, null, null);
         Database.resetBufferPool(2);
 
         // BEGIN TRANSACTION

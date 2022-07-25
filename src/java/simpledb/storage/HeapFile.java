@@ -117,6 +117,7 @@ public class HeapFile implements DbFile {
         // some code goes here
 
         HeapPage page = null;
+        // 查找可用的page
         for (int i = 0; i < numPages(); i++) {
             page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, i), Permissions.READ_WRITE);
             if (page.getNumEmptySlots() > 0) {
@@ -128,8 +129,9 @@ public class HeapFile implements DbFile {
         if (page == null) {
             page = new HeapPage(new HeapPageId(id, numPages()), new byte[BufferPool.getPageSize()]);
         }
+        //进行插入操作，标记page为dirty
         page.insertTuple(t);
-        this.writePage(page);
+        page.markDirty(true, tid);
         return Collections.singletonList(page);
         // not necessary for lab1
     }
@@ -137,7 +139,8 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException, TransactionAbortedException {
         // some code goes here
-        return null;
+        throw new RuntimeException("");
+//        return null;
         // not necessary for lab1
     }
 

@@ -103,7 +103,11 @@ public class SeqScan implements OpIterator {
         String[] names = new String[tupleDesc.numFields()];
         for (int i = 0; i < tupleDesc.numFields(); i++) {
             types[i] = tupleDesc.getFieldType(i);
-            names[i] = this.tableAlias + "." + tupleDesc.getFieldName(i);
+            if (!"".equals(this.tableAlias)) {
+                names[i] = this.tableAlias + "." + tupleDesc.getFieldName(i);
+            } else {
+                names[i] = tupleDesc.getFieldName(i);
+            }
         }
         return new TupleDesc(types, names);
     }

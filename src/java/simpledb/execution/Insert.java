@@ -90,6 +90,7 @@ public class Insert extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
+        count = 0;
         while (child.hasNext()) {
             Tuple next = child.next();
             try {
@@ -100,9 +101,16 @@ public class Insert extends Operator {
                 break;
             }
         }
-        Tuple tu = new Tuple(tupleDesc);
-        tu.setField(0, new IntField(count));
-        return tu;
+
+        // 返回操作执行的次数
+        if (count == 0) {
+            return null;
+        } else {
+            Tuple tu = new Tuple(tupleDesc);
+            tu.setField(0, new IntField(count));
+            count = 0;
+            return tu;
+        }
     }
 
     @Override

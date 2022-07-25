@@ -51,7 +51,7 @@ public class BufferPool {
          * 2. pageId 有 holder，但是holder是自己,可以获取锁
          * 3. 其他人获取了锁，不能获取锁
          */
-        public void lock(PageId pid, TransactionId tid, Permissions perm) {
+        public boolean lock(PageId pid, TransactionId tid, Permissions perm) {
 
             synchronized (innerLock) {
                 Holders holders = pageHolderCache.get(pid);
@@ -60,19 +60,19 @@ public class BufferPool {
                     holders = new Holders();
                     pageHolderCache.put(pid, holders);
                     holders.addHolder(Holder.build(tid, perm));
-                    return;
+                    return true;
                 } else if (holders.size() == 1 && holders.get(tid) != null) {
                     // 有一个锁,且自己的锁: 升级 or 降级
                     holders.get(tid).reentrant(perm);
-                    return;
+                    return true;
                 } else if (perm == Permissions.READ_ONLY && holders.map.values().stream().allMatch(l -> l.exclusive.get() == 0)) {
                     // 都是读锁,可以共享
                     holders.addHolder(Holder.build(tid, Permissions.READ_ONLY));
-                    return;
+                    return true;
                 }
             }
 
-            lock(pid, tid, perm);
+            return false;
         }
 
         /**
@@ -228,7 +228,9 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
-        pageLock.lock(pid, tid, perm);
+        while (!pageLock.lock(pid, tid, perm)) {
+
+        }
         if (!pages.containsKey(pid)) {
             DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             if (databaseFile == null) {
@@ -266,7 +268,7 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) {
         // some code goes here
         // not necessary for lab1|lab2
-        this.transactionComplete(tid,true);
+        this.transactionComplete(tid, true);
     }
 
     /**
@@ -411,19 +413,20 @@ public class BufferPool {
         // not necessary for lab1
 
         Iterator<Map.Entry<PageId, Page>> iterator = pages.entrySet().iterator();
+        //遍历所有页面
         while (iterator.hasNext()) {
             Map.Entry<PageId, Page> next = iterator.next();
             PageId pid = next.getKey();
-            Holders holders = pageLock.pageHolderCache.get(pid);
-            if (holders == null || holders.size() == 0) {
+            if (Database.getBufferPool().pages.get(pid).isDirty() == null) {
+                //替换掉干净的页面
                 try {
                     flushPage(pid);
-                    discardPage(pid);
-                    pageLock.pageHolderCache.remove(pid);
-                    return;
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+                discardPage(pid);
+                pageLock.pageHolderCache.remove(pid);
+                return;
             }
         }
         throw new DbException("");
