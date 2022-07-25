@@ -1,6 +1,5 @@
 package simpledb.storage;
 
-import simpledb.common.Catalog;
 import simpledb.common.Database;
 import simpledb.common.DbException;
 import simpledb.common.Permissions;
@@ -25,6 +24,7 @@ public class HeapFile implements DbFile {
     private final File file;
     private final TupleDesc tupleDesc;
     private final int id;
+    private int pageSize;
 
 
     /**
@@ -38,6 +38,7 @@ public class HeapFile implements DbFile {
         this.id = f.getAbsolutePath().hashCode();
         this.file = f;
         this.tupleDesc = td;
+        this.pageSize = (int) (this.file.length() / BufferPool.getPageSize());
     }
 
     /**
@@ -109,7 +110,7 @@ public class HeapFile implements DbFile {
      */
     public int numPages() {
         // some code goes here
-        return (int) (this.file.length() / BufferPool.getPageSize());
+        return this.pageSize;
     }
 
     // see DbFile.java for javadocs
@@ -128,6 +129,7 @@ public class HeapFile implements DbFile {
 
         if (page == null) {
             page = new HeapPage(new HeapPageId(id, numPages()), new byte[BufferPool.getPageSize()]);
+            pageSize++;
         }
         //进行插入操作，标记page为dirty
         page.insertTuple(t);

@@ -228,8 +228,11 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
+        long startTime = System.currentTimeMillis();
         while (!pageLock.lock(pid, tid, perm)) {
-
+            if (System.currentTimeMillis() - startTime> 1000) {
+                throw new TransactionAbortedException();
+            }
         }
         if (!pages.containsKey(pid)) {
             DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
