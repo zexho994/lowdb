@@ -283,10 +283,12 @@ public class BufferPool {
         // not necessary for lab1|lab2
         Map<PageId, Holders> pageHolderCache = pageLock.pageHolderCache;
         Iterator<PageId> iterator = pageHolderCache.keySet().stream().iterator();
+        // 遍历所有page
         while (iterator.hasNext()) {
+            // 找到tid包含的事务
             PageId pid = iterator.next();
             Holders holders = pageHolderCache.get(pid);
-            if (!holders.contains(tid)) {
+            if (!holders.contains(tid) || !Database.getBufferPool().pages.containsKey(pid)) {
                 continue;
             }
             if (commit) {

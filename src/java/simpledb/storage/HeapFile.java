@@ -157,16 +157,12 @@ public class HeapFile implements DbFile {
                 iterator = getIterator(idx);
             }
 
-            private Iterator<Tuple> getIterator(int pageNo) {
+            private Iterator<Tuple> getIterator(int pageNo) throws TransactionAbortedException, DbException {
                 if (pageNo > numPages()) {
                     return null;
                 }
-                try {
-                    HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, pageNo), Permissions.READ_WRITE);
-                    iterator = page.iterator();
-                } catch (TransactionAbortedException | DbException e) {
-                    throw new RuntimeException(e);
-                }
+                HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, pageNo), Permissions.READ_WRITE);
+                iterator = page.iterator();
                 return iterator;
             }
 
