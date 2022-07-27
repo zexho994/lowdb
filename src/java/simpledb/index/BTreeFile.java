@@ -183,26 +183,34 @@ public class BTreeFile implements DbFile {
      */
     private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm, Field f) throws DbException, TransactionAbortedException {
         // some code goes here
+        // 查获页数据
         BTreePage page = (BTreePage) this.getPage(tid, dirtypages, pid, perm);
+
+        // 暂时无法ROOT_PRT和HEADER，先抛异常
         if (pid.pgcateg() == BTreePageId.ROOT_PTR || pid.pgcateg() == BTreePageId.HEADER) {
             throw new RuntimeException();
         } else if (pid.pgcateg() == BTreePageId.INTERNAL) {
+            //如果是内页，进行遍历操作
             BTreeInternalPage internalPage = (BTreeInternalPage) page;
             Iterator<BTreeEntry> iterator = internalPage.iterator();
+            //对于f为空的情况，直接范围left child
             if (f == null) {
                 return findLeafPage(tid, dirtypages, iterator.next().getLeftChild(), perm, f);
             }
             BTreeEntry last = null;
             while (iterator.hasNext()) {
                 BTreeEntry next = iterator.next();
+                // 第一次出现节点值大于目标值时，就是我们要找的位置，像下遍历左节点
                 if (next.getKey().compare(Op.GREATER_THAN, f)) {
                     return findLeafPage(tid, dirtypages, next.getLeftChild(), perm, f);
                 }
                 last = next;
             }
+            // 到了这里，说明 while 里面没有出现小于目标值的直接，那就访问最右的节点
             return findLeafPage(tid, dirtypages, last.getRightChild(), perm, f);
         }
 
+        // 到了这里的肯定是叶子页
         return (BTreeLeafPage) page;
     }
 
