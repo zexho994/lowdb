@@ -3,6 +3,8 @@ package simpledb.storage;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
+import simpledb.index.BTreeFile;
+import simpledb.index.BTreeLeafPage;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -184,7 +186,6 @@ public class BufferPool {
 
     }
 
-
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
@@ -230,7 +231,7 @@ public class BufferPool {
         // some code goes here
         long startTime = System.currentTimeMillis();
         while (!pageLock.lock(pid, tid, perm)) {
-            if (System.currentTimeMillis() - startTime> 1000) {
+            if (System.currentTimeMillis() - startTime > 1000) {
                 throw new TransactionAbortedException();
             }
         }
@@ -357,10 +358,12 @@ public class BufferPool {
     public void deleteTuple(TransactionId tid, Tuple t) throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
-
-        HeapPage page = (HeapPage) getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
-        if (page == null) throw new DbException("page not exist");
-        page.deleteTuple(t);
+        BTreeLeafPage page = (BTreeLeafPage) getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
+        if (page == null) {
+            throw new DbException("page not exist");
+        }
+        BTreeFile databaseFile = (BTreeFile) Database.getCatalog().getDatabaseFile(page.getId().getTableId());
+        databaseFile.deleteTuple(tid, t);
     }
 
     /**
