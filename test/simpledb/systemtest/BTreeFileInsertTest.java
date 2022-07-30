@@ -81,6 +81,7 @@ public class BTreeFileInsertTest extends SimpleDbTestBase {
 		} 
 	}
 
+	// 处理重复的数据
 	@Test public void addDuplicateTuples() throws Exception {
 		// create an empty B+ tree file keyed on the second field of a 2-field tuple
 		File emptyFile = File.createTempFile("empty", ".dat");
