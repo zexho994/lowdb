@@ -44,9 +44,8 @@ public class HeapPage implements Page {
 
     byte[] oldData;
 
-    boolean dirty = false;
-
     private final Byte oldDataLock = (byte) 0;
+
     private TransactionId tid;
 
     /**

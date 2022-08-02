@@ -117,18 +117,19 @@ public class HeapFile implements DbFile {
     public List<Page> insertTuple(TransactionId tid, Tuple t) throws DbException, IOException, TransactionAbortedException {
         // some code goes here
 
-        HeapPage page = null;
         // 查找可用的page
+        HeapPage page = null;
         for (int i = 0; i < numPages(); i++) {
             page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, i), Permissions.READ_WRITE);
             if (page.getNumEmptySlots() > 0) {
                 break;
             }
             page = null;
+            Database.getBufferPool().unlock(page.getId(), tid);
         }
 
         if (page == null) {
-            page = new HeapPage(new HeapPageId(id, numPages()), new byte[BufferPool.getPageSize()]);
+            page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(id, numPages()), Permissions.READ_WRITE);
             pageSize++;
         }
         //进行插入操作，标记page为dirty

@@ -95,8 +95,19 @@ public class BufferPool {
             }
         }
 
+        public void unlockAll(PageId pid) {
+            synchronized (innerLock) {
+                pageHolderCache.remove(pid);
+            }
+        }
+
         public boolean hold(PageId pid, TransactionId tid) {
             return pageHolderCache.get(pid).contains(tid);
+        }
+
+        public boolean hasLock(PageId pid) {
+            Holders l = pageHolderCache.get(pid);
+            return l != null && l.size() > 0;
         }
 
     }
@@ -231,11 +242,12 @@ public class BufferPool {
         // some code goes here
         long startTime = System.currentTimeMillis();
         while (!pageLock.lock(pid, tid, perm)) {
-            if (System.currentTimeMillis() - startTime > 1000) {
+            if (System.currentTimeMillis() - startTime > 3000) {
                 throw new TransactionAbortedException();
             }
         }
-        if (!pages.containsKey(pid)) {
+        Page page = pages.get(pid);
+        if (page == null) {
             DbFile databaseFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             if (databaseFile == null) {
                 return null;
@@ -243,10 +255,17 @@ public class BufferPool {
             if (this.numPages() >= maxPages()) {
                 this.evictPage();
             }
-            Page page = databaseFile.readPage(pid);
+            page = databaseFile.readPage(pid);
             pages.put(pid, page);
+            // 返回page前先记录下快照
+            page.setBeforeImage();
         }
-        return pages.get(pid);
+
+        return page;
+    }
+
+    public void unlock(PageId pid, TransactionId tid) {
+        pageLock.unlock(pid, tid);
     }
 
     /**
@@ -285,31 +304,34 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit) {
         // some code goes here
         // not necessary for lab1|lab2
-        Map<PageId, Holders> pageHolderCache = pageLock.pageHolderCache;
-        Iterator<PageId> iterator = pageHolderCache.keySet().stream().iterator();
+        Iterator<PageId> iterator = this.pages.keySet().stream().iterator();
         // 遍历所有page
         while (iterator.hasNext()) {
             // 找到tid包含的事务
-            PageId pid = iterator.next();
-            Holders holders = pageHolderCache.get(pid);
-            if (!holders.contains(tid) || !Database.getBufferPool().pages.containsKey(pid)) {
-                continue;
-            }
-            if (commit) {
-                try {
-                    flushPage(pid);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+            try {
+                PageId pid = iterator.next();
+                if (commit) {
+                    flushPages(tid);
+                    Database.getLogFile().logCheckpoint();
+                } else {
+                    recoverPages(tid);
                 }
-            } else {
-                this.discardPage(pid);
-                try {
-                    this.getPage(tid, pid, Permissions.READ_ONLY);
-                } catch (TransactionAbortedException | DbException e) {
-                    throw new RuntimeException(e);
+                if (this.pageLock.hasLock(pid)) {
+                    this.pageLock.pageHolderCache.get(pid).remove(tid);
                 }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-            holders.remove(tid);
+        }
+    }
+
+    // 恢复page的数据，使用before image覆盖当前数据
+    public void recoverPages(TransactionId tid) {
+        try {
+            Database.getLogFile().rollback(tid);
+            Database.getLogFile().logCheckpoint();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -374,7 +396,13 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for (Map.Entry<PageId, Page> entry : pages.entrySet()) {
+            Page page = entry.getValue();
+            // 只对脏页进行刷新
+            if (page.isDirty() != null) {
+                flushPage(page.getId());
+            }
+        }
     }
 
     /**
@@ -389,7 +417,8 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
-        pages.remove(pid);
+        this.pages.remove(pid);
+        this.pageLock.unlockAll(pid);
     }
 
     /**
@@ -401,7 +430,16 @@ public class BufferPool {
         // some code goes here
         // not necessary for lab1
         Page page = pages.get(pid);
-        Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(page);
+        DbFile file = Database.getCatalog().getDatabaseFile(pid.getTableId());
+
+        // 保存脏页再刷盘
+        if (page.isDirty() != null) {
+            Database.getLogFile().logWrite(page.isDirty(), page.getBeforeImage(), page);
+            Database.getLogFile().force();
+        }
+
+        file.writePage(page);
+        page.markDirty(false, null);
     }
 
     /**
@@ -410,6 +448,13 @@ public class BufferPool {
     public synchronized void flushPages(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+        for (Map.Entry<PageId, Page> entry : pages.entrySet()) {
+            Page page = entry.getValue();
+            if (page.isDirty() == tid) {
+                flushPage(page.getId());
+                page.setBeforeImage();
+            }
+        }
     }
 
     /**
@@ -433,7 +478,6 @@ public class BufferPool {
                     throw new RuntimeException(e);
                 }
                 discardPage(pid);
-                pageLock.pageHolderCache.remove(pid);
                 return;
             }
         }

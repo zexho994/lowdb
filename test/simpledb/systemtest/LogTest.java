@@ -26,8 +26,7 @@ public class LogTest extends SimpleDbTestBase {
     HeapFile hf1;
     HeapFile hf2;
 
-    void insertRow(HeapFile hf, Transaction t, int v1)
-        throws DbException, TransactionAbortedException {
+    void insertRow(HeapFile hf, Transaction t, int v1) throws DbException, TransactionAbortedException {
         // Create a row to insert
         TupleDesc twoIntColumns = Utility.getTupleDesc(2);
         Tuple value = new Tuple(twoIntColumns);
@@ -40,78 +39,63 @@ public class LogTest extends SimpleDbTestBase {
         insert.open();
         Tuple result = insert.next();
         assertEquals(SystemTestUtil.SINGLE_INT_DESCRIPTOR, result.getTupleDesc());
-        assertEquals(1, ((IntField)result.getField(0)).getValue());
+        assertEquals(1, ((IntField) result.getField(0)).getValue());
         assertFalse(insert.hasNext());
         insert.close();
     }
 
     // check that the specified tuple is, or is not, present
-    void look(HeapFile hf, Transaction t, int v1, boolean present)
-        throws DbException, TransactionAbortedException {
+    void look(HeapFile hf, Transaction t, int v1, boolean present) throws DbException, TransactionAbortedException {
         int count = 0;
         SeqScan scan = new SeqScan(t.getId(), hf.getId(), "");
         scan.open();
-        while(scan.hasNext()){
+        while (scan.hasNext()) {
             Tuple tu = scan.next();
-            int x = ((IntField)tu.getField(0)).getValue();
-            if(x == v1)
-                count = count + 1;
+            int x = ((IntField) tu.getField(0)).getValue();
+            if (x == v1) count = count + 1;
         }
         scan.close();
-        if(count > 1)
-            throw new RuntimeException("LogTest: tuple repeated");
-        if(present && count < 1)
-            throw new RuntimeException("LogTest: tuple missing");
-        if(!present && count > 0)
-            throw new RuntimeException("LogTest: tuple present but shouldn't be");
+        if (count > 1) throw new RuntimeException("LogTest: tuple repeated");
+        if (present && count < 1) throw new RuntimeException("LogTest: tuple missing");
+        if (!present && count > 0) throw new RuntimeException("LogTest: tuple present but shouldn't be");
     }
 
     // insert tuples
-    void doInsert(HeapFile hf, int t1, int t2)
-        throws DbException, TransactionAbortedException, IOException {
+    void doInsert(HeapFile hf, int t1, int t2) throws DbException, TransactionAbortedException, IOException {
         Transaction t = new Transaction();
         t.start();
-        if(t1 != -1)
-            insertRow(hf, t, t1);
+        if (t1 != -1) insertRow(hf, t, t1);
         Database.getBufferPool().flushAllPages();
-        if(t2 != -1)
-            insertRow(hf, t, t2);
+        if (t2 != -1) insertRow(hf, t, t2);
         t.commit();
     }
 
-    void abort(Transaction t)
-        throws IOException {
+    void abort(Transaction t) throws IOException {
         // t.transactionComplete(true); // abort
         Database.getBufferPool().flushAllPages(); // XXX defeat NO-STEAL-based abort
         Database.getLogFile().logAbort(t.getId()); // does rollback too
         Database.getBufferPool().flushAllPages(); // prevent NO-STEAL-based abort from
-                                                  // un-doing the rollback
+        // un-doing the rollback
         Database.getBufferPool().transactionComplete(t.getId(), false); // release locks
     }
 
     // insert tuples
     // force dirty pages to disk, defeating NO-STEAL
     // abort
-    void dontInsert(HeapFile hf, int t1)
-        throws DbException, TransactionAbortedException, IOException {
+    void dontInsert(HeapFile hf, int t1) throws DbException, TransactionAbortedException, IOException {
         Transaction t = new Transaction();
         t.start();
-        if(t1 != -1)
-            insertRow(hf, t, t1);
-        if(-1 != -1)
-            insertRow(hf, t, -1);
-        if(t1 != -1)
-            look(hf, t, t1, true);
-        if(-1 != -1)
-            look(hf, t, -1, true);
+        if (t1 != -1) insertRow(hf, t, t1);
+        if (-1 != -1) insertRow(hf, t, -1);
+        if (t1 != -1) look(hf, t, t1, true);
+        if (-1 != -1) look(hf, t, -1, true);
         abort(t);
     }
 
     // simulate crash
     // restart Database
     // run log recovery
-    void crash()
-        throws IOException {
+    void crash() throws IOException {
         Database.reset();
         hf1 = Utility.openHeapFile(2, file1);
         hf2 = Utility.openHeapFile(2, file2);
@@ -120,8 +104,7 @@ public class LogTest extends SimpleDbTestBase {
 
     // create an initial database with two empty tables
     // does *not* initiate log file recovery
-    void setup()
-            throws IOException {
+    void setup() throws IOException {
         Database.reset();
 
         // empty heap files w/ 2 columns.
@@ -134,15 +117,15 @@ public class LogTest extends SimpleDbTestBase {
         hf2 = Utility.createEmptyHeapFile(file2.getAbsolutePath(), 2);
     }
 
-    @Test public void PatchTest()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void PatchTest() throws IOException, DbException, TransactionAbortedException {
         setup();
 
         // *** Test:
         // check that BufferPool.flushPage() calls LogFile.logWrite().
         doInsert(hf1, 1, 2);
 
-        if(Database.getLogFile().getTotalRecords() != 4)
+        if (Database.getLogFile().getTotalRecords() != 4)
             throw new RuntimeException("LogTest: wrong # of log records; patch failed?");
 
         // *** Test:
@@ -150,18 +133,14 @@ public class LogTest extends SimpleDbTestBase {
         // called Page.setBeforeImage().
         Transaction t1 = new Transaction();
         t1.start();
-        Page p = Database.getBufferPool().getPage(t1.getId(),
-                                                  new HeapPageId(hf1.getId(), 0),
-                                                  Permissions.READ_ONLY);
+        Page p = Database.getBufferPool().getPage(t1.getId(), new HeapPageId(hf1.getId(), 0), Permissions.READ_ONLY);
         Page p1 = p.getBeforeImage();
-        boolean same = Arrays.equals(p.getPageData(),
-                                     p1.getPageData());
-        if(!same)
-            throw new RuntimeException("LogTest:setBeforeImage() not called? patch failed?");
+        boolean same = Arrays.equals(p.getPageData(), p1.getPageData());
+        if (!same) throw new RuntimeException("LogTest:setBeforeImage() not called? patch failed?");
     }
 
-    @Test public void TestFlushAll()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestFlushAll() throws IOException, DbException, TransactionAbortedException {
         setup();
 
         // *** Test:
@@ -175,12 +154,12 @@ public class LogTest extends SimpleDbTestBase {
         Database.getBufferPool().flushAllPages();
         HeapPage xp2 = (HeapPage) hf1.readPage(new HeapPageId(hf1.getId(), 0));
 
-        if(xp1.getNumEmptySlots() == xp2.getNumEmptySlots())
+        if (xp1.getNumEmptySlots() == xp2.getNumEmptySlots())
             throw new RuntimeException("LogTest: flushAllPages() had no effect");
     }
 
-    @Test public void TestCommitCrash()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestCommitCrash() throws IOException, DbException, TransactionAbortedException {
         setup();
 
         // *** Test:
@@ -198,8 +177,8 @@ public class LogTest extends SimpleDbTestBase {
         t.commit();
     }
 
-    @Test public void TestAbort()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestAbort() throws IOException, DbException, TransactionAbortedException {
         setup();
         doInsert(hf1, 1, 2);
 
@@ -218,8 +197,8 @@ public class LogTest extends SimpleDbTestBase {
         t.commit();
     }
 
-    @Test public void TestAbortCommitInterleaved()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestAbortCommitInterleaved() throws IOException, DbException, TransactionAbortedException {
         setup();
         doInsert(hf1, 1, 2);
 
@@ -251,8 +230,8 @@ public class LogTest extends SimpleDbTestBase {
         t.commit();
     }
 
-    @Test public void TestAbortCrash()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestAbortCrash() throws IOException, DbException, TransactionAbortedException {
         setup();
         doInsert(hf1, 1, 2);
 
@@ -280,8 +259,8 @@ public class LogTest extends SimpleDbTestBase {
         t.commit();
     }
 
-    @Test public void TestCommitAbortCommitCrash()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestCommitAbortCommitCrash() throws IOException, DbException, TransactionAbortedException {
         setup();
         doInsert(hf1, 1, 2);
 
@@ -320,8 +299,8 @@ public class LogTest extends SimpleDbTestBase {
         t.commit();
     }
 
-    @Test public void TestOpenCrash()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestOpenCrash() throws IOException, DbException, TransactionAbortedException {
         setup();
         doInsert(hf1, 1, 2);
 
@@ -346,8 +325,8 @@ public class LogTest extends SimpleDbTestBase {
         t.commit();
     }
 
-    @Test public void TestOpenCommitOpenCrash()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestOpenCommitOpenCrash() throws IOException, DbException, TransactionAbortedException {
         setup();
         doInsert(hf1, 1, 2);
 
@@ -387,8 +366,8 @@ public class LogTest extends SimpleDbTestBase {
         t.commit();
     }
 
-    @Test public void TestOpenCommitCheckpointOpenCrash()
-            throws IOException, DbException, TransactionAbortedException {
+    @Test
+    public void TestOpenCommitCheckpointOpenCrash() throws IOException, DbException, TransactionAbortedException {
         setup();
         doInsert(hf1, 1, 2);
 
